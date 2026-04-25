@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Elder Magic — Hand Sigils of the Five Elements</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Cinzel+Decorative:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent:  #b588ff;
+    --accent2: #66e6ff;
+    --accent3: #ff88cc;
+    --bg:      #05020b;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: radial-gradient(ellipse at center, #0a0416 0%, #02010a 100%);
+    color: #e9d9ff;
+    font-family: 'Cinzel', 'Georgia', serif;
+  }
+  canvas { display: block; }
+
+  /* ── Layering ── */
+  #threeCanvas  { position: fixed; inset: 0; z-index: 1; }
+  #inkCanvas    { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+  #shockCanvas  { position: fixed; inset: 0; z-index: 4; pointer-events: none; }
+  #vignette     { position: fixed; inset: 0; z-index: 5; pointer-events: none;
+                  background: radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,0.9) 100%); }
+  #scanlines    { position: fixed; inset: 0; z-index: 5; pointer-events: none; opacity: 0.07;
+                  background: repeating-linear-gradient(0deg, rgba(255,255,255,0.15) 0px,
+                    rgba(255,255,255,0.15) 1px, transparent 1px, transparent 3px);
+                  mix-blend-mode: overlay; }
+
+  /* ── Camera preview ── */
+  #videoEl {
+    position: fixed; top: 12px; right: 12px; width: 160px; height: 120px;
+    z-index: 6; border: 1px solid rgba(181,136,255,0.45); border-radius: 12px;
+    transform: scaleX(-1); object-fit: cover; opacity: 0.82;
+    box-shadow: 0 0 22px rgba(181,136,255,0.3);
+  }
+  #debugCanvas {
+    position: fixed; top: 12px; right: 12px; width: 160px; height: 120px;
+    z-index: 7; border-radius: 12px; pointer-events: none; transform: scaleX(-1);
+  }
+
+  /* ── Audio visualizer ── */
+  #audioViz {
+    position: fixed; bottom: 0; left: 0; width: 100%; height: 72px;
+    z-index: 8; pointer-events: none;
+  }
+
+  /* ── Start Overlay ── */
+  #startOverlay {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(circle at center, rgba(28,8,58,0.94), rgba(5,2,11,0.99));
+    backdrop-filter: blur(14px);
+    transition: opacity 1.2s ease;
+  }
+  #startOverlay.hidden { opacity: 0; pointer-events: none; }
+
+  #overlayGlow {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 60% 40% at 50% 50%, rgba(181,136,255,0.07) 0%, transparent 70%);
+    animation: pulseGlow 4s ease-in-out infinite;
+  }
+  @keyframes pulseGlow {
+    0%,100% { opacity: 0.6; } 50% { opacity: 1; }
+  }
+
+  #startOverlay h1 {
+    font-family: 'Cinzel Decorative', 'Cinzel', serif;
+    font-size: clamp(2.2rem, 6vw, 4.8rem);
+    font-weight: 400; letter-spacing: 0.18em;
+    background: linear-gradient(135deg, #b588ff 0%, #66e6ff 50%, #ff88cc 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 30px rgba(181,136,255,0.6));
+    margin-bottom: 0.15em; position: relative; z-index: 1;
+    animation: titleFloat 6s ease-in-out infinite;
+  }
+  @keyframes titleFloat {
+    0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); }
+  }
+
+  #startOverlay h2 {
+    font-size: clamp(0.65rem, 1.8vw, 0.9rem);
+    font-style: italic; color: #a88dd4;
+    letter-spacing: 0.45em; text-transform: uppercase;
+    margin-bottom: 1.8em; position: relative; z-index: 1;
+  }
+
+  #startOverlay > p {
+    max-width: 560px; text-align: center; line-height: 1.75;
+    color: #c8b5e8; padding: 0 24px; font-family: 'Georgia', serif;
+    font-size: 0.88rem; margin-bottom: 0.5em; position: relative; z-index: 1;
+  }
+
+  #gestureList {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+    gap: 12px; max-width: 700px; margin: 1.6em 20px; position: relative; z-index: 1;
+  }
+  .gestureCard {
+    padding: 13px 15px;
+    background: rgba(28,12,58,0.42);
+    border: 1px solid rgba(181,136,255,0.28);
+    border-radius: 12px; backdrop-filter: blur(10px);
+    font-size: 0.82rem; line-height: 1.5;
+    transition: border-color 0.3s, background 0.3s;
+  }
+  .gestureCard:hover {
+    border-color: rgba(181,136,255,0.6);
+    background: rgba(40,18,80,0.5);
+  }
+  .gestureCard b { color: #d1b3ff; letter-spacing: 0.08em; display: block; margin-bottom: 2px; }
+  .gestureCard span { color: #8ab8d4; font-size: 0.78rem; font-family: 'Georgia', serif; font-style: italic; }
+
+  #startBtn {
+    margin-top: 1.2em; padding: 15px 46px;
+    font-family: 'Cinzel', serif; font-size: 0.9rem; letter-spacing: 0.35em;
+    background: transparent; color: #e9d9ff; text-transform: uppercase;
+    border: 1px solid rgba(181,136,255,0.55); border-radius: 2px; cursor: pointer;
+    transition: all 0.35s ease; position: relative; z-index: 1;
+    box-shadow: 0 0 22px rgba(181,136,255,0.18), inset 0 0 22px rgba(181,136,255,0.08);
+  }
+  #startBtn::before {
+    content: ''; position: absolute; inset: -1px;
+    border: 1px solid rgba(102,230,255,0.0);
+    border-radius: 2px; transition: border-color 0.35s;
+  }
+  #startBtn:hover {
+    background: rgba(181,136,255,0.14);
+    box-shadow: 0 0 50px rgba(181,136,255,0.5), inset 0 0 30px rgba(181,136,255,0.18);
+    transform: scale(1.03);
+  }
+  #startBtn:hover::before { border-color: rgba(102,230,255,0.4); }
+
+  #startOverlay footer {
+    margin-top: 1.8em; font-size: 0.7rem; opacity: 0.4;
+    letter-spacing: 0.15em; font-family: 'Georgia', serif;
+    position: relative; z-index: 1;
+  }
+
+  /* ── HUD ── */
+  #hud {
+    position: fixed; top: 14px; left: 14px; z-index: 10;
+    padding: 13px 18px; min-width: 210px;
+    background: rgba(8,4,22,0.6); backdrop-filter: blur(14px);
+    border: 1px solid rgba(181,136,255,0.3); border-radius: 12px;
+    font-size: 0.78rem; line-height: 1.75;
+    box-shadow: 0 0 20px rgba(181,136,255,0.1);
+  }
+  #hud .row { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+  #hud .label { color: #7a9ab5; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.68rem; }
+  #hud .value { color: #e9d9ff; font-weight: 600; }
+  #chargeBarWrap {
+    width: 100%; height: 5px; background: rgba(181,136,255,0.12);
+    border-radius: 3px; margin: 7px 0 2px; overflow: hidden;
+  }
+  #chargeBar {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #66e6ff, #b588ff, #ff88cc);
+    box-shadow: 0 0 8px #b588ff;
+    transition: width 0.08s linear;
+  }
+  #gestureTag { color: var(--accent2); text-shadow: 0 0 10px currentColor; font-weight: 700; }
+  #fusionTag  { color: #ff99ff; text-shadow: 0 0 10px currentColor; font-weight: 700;
+                animation: fusionPulse 0.6s ease-in-out infinite alternate; display: none; }
+  @keyframes fusionPulse { from { opacity: 0.7; } to { opacity: 1; filter: brightness(1.3); } }
+
+  /* ── Spell log ── */
+  #spellLog {
+    position: fixed; bottom: 82px; left: 14px; z-index: 9;
+    width: 220px; pointer-events: none;
+  }
+  .logEntry {
+    font-size: 0.7rem; letter-spacing: 0.1em; font-family: 'Georgia', serif; font-style: italic;
+    color: #c5b0e8; opacity: 0;
+    animation: logFade 3s ease forwards;
+    text-shadow: 0 0 8px rgba(181,136,255,0.6);
+    margin-bottom: 3px;
+  }
+  @keyframes logFade { 0%{opacity:0;transform:translateY(6px)} 15%{opacity:1;transform:translateY(0)} 70%{opacity:1} 100%{opacity:0} }
+
+  /* ── Instruction hint ── */
+  #instructionHint {
+    position: fixed; bottom: 82px; left: 50%; transform: translateX(-50%);
+    z-index: 9; font-size: 0.68rem; letter-spacing: 0.22em; text-transform: uppercase;
+    color: #8ca5c9; opacity: 0.75; white-space: nowrap; pointer-events: none;
+    background: rgba(0,0,0,0.38); padding: 6px 16px; border-radius: 40px;
+    font-family: 'Georgia', serif; font-style: italic;
+  }
+
+  /* ── Mega spell banner ── */
+  #megaBanner {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) scale(0.6);
+    z-index: 20; pointer-events: none; text-align: center;
+    opacity: 0; transition: none;
+  }
+  #megaBanner.show {
+    animation: bannerPop 2.2s ease forwards;
+  }
+  @keyframes bannerPop {
+    0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.6); }
+    15%  { opacity: 1; transform: translate(-50%,-50%) scale(1.08); }
+    30%  { transform: translate(-50%,-50%) scale(1.0); }
+    70%  { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%,-50%) scale(1.1); }
+  }
+  #megaBanner h2 {
+    font-family: 'Cinzel Decorative', serif; font-size: clamp(1.8rem, 5vw, 3.5rem);
+    font-weight: 400; letter-spacing: 0.22em;
+    background: linear-gradient(135deg, #ff88cc, #b588ff, #66e6ff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 20px rgba(255,136,200,0.8));
+  }
+  #megaBanner p {
+    font-size: 0.8rem; letter-spacing: 0.3em; color: #cc99ff;
+    text-transform: uppercase; margin-top: 4px; opacity: 0.9;
+  }
+
+  @media (max-width: 600px) {
+    #videoEl, #debugCanvas { width: 100px; height: 75px; }
+    #hud { font-size: 0.7rem; min-width: 168px; padding: 10px 14px; }
+    .gestureCard { font-size: 0.72rem; }
+    #spellLog { width: 170px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ START OVERLAY ═══ -->
+<div id="startOverlay">
+  <div id="overlayGlow"></div>
+  <h1>✦ Elder Magic ✦</h1>
+  <h2>Hand Sigils of the Five Elements</h2>
+  <p>Ancient gestures awaken primal forces. Weave <em>earth, air, fire, water,</em> and the <em>arcane tongue</em> with your bare hands.</p>
+  <p style="margin-top:0.5em; font-size:0.78rem; color:#9080b8;">Hold a sigil steady to charge a <b style="color:#d1b3ff;">Mega Spell</b>. Both hands showing the same sigil summons <b style="color:#ff99ff;">Elder Fusion</b>.</p>
+  <div id="gestureList">
+    <div class="gestureCard"><b>✊ Fist</b><span>Earth — seismic pulse</span></div>
+    <div class="gestureCard"><b>🖐 Open Palm</b><span>Air — gale force</span></div>
+    <div class="gestureCard"><b>🤏 Pinch</b><span>Fire — inferno spark</span></div>
+    <div class="gestureCard"><b>✌ Peace</b><span>Water — tidal surge</span></div>
+    <div class="gestureCard"><b>✋ Full Spread</b><span>Arcane — cosmic choir</span></div>
+  </div>
+  <button id="startBtn">⚡ Begin Ritual ⚡</button>
+  <footer>Requires camera &amp; audio · best in Chrome</footer>
+</div>
+
+<!-- ═══ HUD ═══ -->
+<div id="hud" style="display:none;">
+  <div class="row"><span class="label">Hands</span><span class="value" id="handsCount">0</span><span class="label">FPS</span><span class="value" id="fpsVal">0</span></div>
+  <div class="row"><span class="label">Sigil</span><span class="value" id="gestureTag">—</span></div>
+  <div class="row" id="fusionRow" style="display:none;"><span class="label">⚡</span><span id="fusionTag">ELDER FUSION</span></div>
+  <div class="row"><span class="label">Charge</span></div>
+  <div id="chargeBarWrap"><div id="chargeBar"></div></div>
+</div>
+
+<div id="spellLog"></div>
+<div id="instructionHint" style="display:none;">✦ Form a sigil — the elements obey ✦</div>
+
+<!-- ═══ Mega Spell Banner ═══ -->
+<div id="megaBanner">
+  <h2 id="megaTitle">MEGA SPELL</h2>
+  <p id="megaSubtitle">EARTH UNLEASHED</p>
+</div>
+
+<!-- ═══ Canvas Layers ═══ -->
+<video id="videoEl" playsinline autoplay muted></video>
+<canvas id="debugCanvas"></canvas>
+<canvas id="threeCanvas"></canvas>
+<canvas id="inkCanvas"></canvas>
+<canvas id="shockCanvas"></canvas>
+<canvas id="audioViz"></canvas>
+<div id="vignette"></div>
+<div id="scanlines"></div>
+
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass }      from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass }      from 'three/addons/postprocessing/ShaderPass.js';
+
+/* ═══════════════════════════════════════════════════════════════
+   GESTURES CONFIG
+═══════════════════════════════════════════════════════════════ */
+const GESTURES = {
+  NONE:   { name: '—',      color: new THREE.Color(0x777777), color2: new THREE.Color(0x444444), freq: 120, hz2: 160, hue: 270 },
+  EARTH:  { name: 'Earth',  color: new THREE.Color(0x9c7c3b), color2: new THREE.Color(0x4a7d3a), freq: 70,  hz2: 110, hue: 35  },
+  AIR:    { name: 'Air',    color: new THREE.Color(0x9ed8ff), color2: new THREE.Color(0xe0f3ff), freq: 360, hz2: 540, hue: 195 },
+  FIRE:   { name: 'Fire',   color: new THREE.Color(0xff6633), color2: new THREE.Color(0xffcc33), freq: 520, hz2: 660, hue: 22  },
+  WATER:  { name: 'Water',  color: new THREE.Color(0x3b9bff), color2: new THREE.Color(0x70dfff), freq: 260, hz2: 340, hue: 210 },
+  ARCANE: { name: 'Arcane', color: new THREE.Color(0xdd88ff), color2: new THREE.Color(0xff99dd), freq: 720, hz2: 880, hue: 285 },
+};
+
+const MEGA_NAMES = {
+  EARTH:  ['SEISMIC ERUPTION','MOUNTAIN SHATTER','TREMOR NOVA'],
+  AIR:    ['GALE TEMPEST','CYCLONE BURST','STORM VEIL'],
+  FIRE:   ['INFERNO NOVA','PYRE ERUPTION','HELLFIRE SIGIL'],
+  WATER:  ['TIDAL WAVE','ABYSSAL SURGE','DEEP CURRENT'],
+  ARCANE: ['COSMIC CHOIR','VOID RESONANCE','ELDER CHORUS'],
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   GLOBAL STATE
+═══════════════════════════════════════════════════════════════ */
+const state = {
+  hands: [],
+  handsData: [makeHandState(0), makeHandState(1)],
+  globalGesture: 'NONE',
+  mana: 0,
+  running: false,
+  chargeTime: 0,
+  charged: false,
+  lastTime: performance.now(),
+  fps: 60, frames: 0, fpsAccum: 0,
+  shake: 0,
+  bloomBoost: 1,
+  fusionActive: false,
+  fusionTimer: 0,
+  spellCooldown: 0,
+};
+
+function makeHandState(i) {
+  return {
+    idx: i, present: false,
+    gesture: 'NONE', prevGesture: 'NONE',
+    gestureHoldTime: 0,
+    palm: new THREE.Vector3(),
+    screen: { x: 0.5, y: 0.5 },
+    system: null,
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DOM REFS
+═══════════════════════════════════════════════════════════════ */
+const videoEl      = document.getElementById('videoEl');
+const debugCanvas  = document.getElementById('debugCanvas');
+const dbgCtx       = debugCanvas.getContext('2d');
+const inkCanvas    = document.getElementById('inkCanvas');
+const inkCtx       = inkCanvas.getContext('2d');
+const shockCanvas  = document.getElementById('shockCanvas');
+const shockCtx     = shockCanvas.getContext('2d');
+const audioVizCv   = document.getElementById('audioViz');
+const audioVizCx   = audioVizCv.getContext('2d');
+const threeCanvas  = document.getElementById('threeCanvas');
+const handsCountEl = document.getElementById('handsCount');
+const fpsEl        = document.getElementById('fpsVal');
+const gestureTagEl = document.getElementById('gestureTag');
+const chargeBarEl  = document.getElementById('chargeBar');
+const fusionRow    = document.getElementById('fusionRow');
+const fusionTagEl  = document.getElementById('fusionTag');
+const megaBanner   = document.getElementById('megaBanner');
+const megaTitle    = document.getElementById('megaTitle');
+const megaSubtitle = document.getElementById('megaSubtitle');
+const spellLog     = document.getElementById('spellLog');
+
+/* ═══════════════════════════════════════════════════════════════
+   RESIZE
+═══════════════════════════════════════════════════════════════ */
+function resizeAll() {
+  const w = window.innerWidth, h = window.innerHeight;
+  for (const c of [inkCanvas, shockCanvas]) { c.width = w; c.height = h; }
+  audioVizCv.width = w; audioVizCv.height = 72;
+  debugCanvas.width = 320; debugCanvas.height = 240;
+  if (renderer) {
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+    composer.setSize(w, h);
+  }
+}
+window.addEventListener('resize', resizeAll);
+
+/* ═══════════════════════════════════════════════════════════════
+   THREE.JS SCENE
+═══════════════════════════════════════════════════════════════ */
+let renderer, scene, camera, composer, bloomPass, chromaticPass;
+let coreOrb, coreOrbMat, coreGlow, starField;
+let fusionGlyph;
+let ambientRunes = [];
+
+function initThree() {
+  renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x000000, 0);
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x050210, 0.019);
+
+  camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 0, 8);
+
+  // ── Starfield ──
+  const starCount = 1800;
+  const sp = new Float32Array(starCount * 3), sc = new Float32Array(starCount * 3);
+  for (let i = 0; i < starCount; i++) {
+    sp[i*3]   = (Math.random() - 0.5) * 90;
+    sp[i*3+1] = (Math.random() - 0.5) * 70;
+    sp[i*3+2] = (Math.random() - 0.5) * 70 - 18;
+    const c = new THREE.Color().setHSL(0.65 + Math.random() * 0.25, 0.65, 0.55 + Math.random() * 0.35);
+    sc[i*3] = c.r; sc[i*3+1] = c.g; sc[i*3+2] = c.b;
+  }
+  const starGeo = new THREE.BufferGeometry();
+  starGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+  starGeo.setAttribute('color',    new THREE.BufferAttribute(sc, 3));
+  starField = new THREE.Points(starGeo, new THREE.PointsMaterial({
+    size: 0.08, vertexColors: true, transparent: true, opacity: 0.88,
+    depthWrite: false, blending: THREE.AdditiveBlending
+  }));
+  scene.add(starField);
+
+  // ── Core orb (wireframe from opus, with solid inner glow from elder) ──
+  const orbGeo  = new THREE.IcosahedronGeometry(0.62, 3);
+  coreOrbMat    = new THREE.MeshBasicMaterial({ color: 0xb588ff, wireframe: true, transparent: true, opacity: 0.45 });
+  coreOrb       = new THREE.Mesh(orbGeo, coreOrbMat);
+  scene.add(coreOrb);
+
+  const innerGeo = new THREE.SphereGeometry(0.38, 24, 24);
+  const innerMat = new THREE.MeshBasicMaterial({ color: 0xdd99ff, transparent: true, opacity: 0.28 });
+  coreGlow = new THREE.Mesh(innerGeo, innerMat);
+  coreOrb.add(coreGlow);
+
+  // ── Ambient drifting rune rings ──
+  for (let i = 0; i < 3; i++) {
+    const rGeo = new THREE.TorusGeometry(1.5 + i * 0.9, 0.012, 8, 64);
+    const rMat = new THREE.MeshBasicMaterial({
+      color: 0x8855cc, transparent: true, opacity: 0.08 + i * 0.03,
+      blending: THREE.AdditiveBlending
+    });
+    const ring = new THREE.Mesh(rGeo, rMat);
+    ring.rotation.x = Math.random() * Math.PI;
+    ring.rotation.y = Math.random() * Math.PI;
+    scene.add(ring);
+    ambientRunes.push(ring);
+  }
+
+  // ── Fusion glyph (RingGeometry hexagonal from opus) ──
+  const fg = new THREE.Group();
+  const glyphMat = new THREE.MeshBasicMaterial({
+    color: 0xffaaff, side: THREE.DoubleSide, transparent: true,
+    opacity: 0, blending: THREE.AdditiveBlending
+  });
+  const ring1 = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.62, 6), glyphMat);
+  const ring2 = new THREE.Mesh(new THREE.RingGeometry(0.28, 0.36, 3), glyphMat.clone());
+  ring2.material.opacity = 0;
+  const ring3 = new THREE.Mesh(new THREE.TorusGeometry(0.78, 0.018, 8, 80), new THREE.MeshBasicMaterial({
+    color: 0xffccff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending
+  }));
+  fg.add(ring1, ring2, ring3);
+  fg.visible = false;
+  scene.add(fg);
+  fusionGlyph = { group: fg, ring1, ring2, ring3 };
+
+  // ── Hand particle systems ──
+  for (let i = 0; i < 2; i++) {
+    state.handsData[i].system = createHandParticleSystem();
+    scene.add(state.handsData[i].system.points);
+    scene.add(state.handsData[i].system.trailLine);
+  }
+
+  // ── Post-processing ──
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight), 1.2, 0.82, 0.2
+  );
+  composer.addPass(bloomPass);
+
+  // Chromatic aberration + film grain (opus shader)
+  chromaticPass = new ShaderPass({
+    uniforms: {
+      tDiffuse: { value: null },
+      uStrength: { value: 0.0026 },
+      uTime:     { value: 0 }
+    },
+    vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+    fragmentShader: `
+      uniform sampler2D tDiffuse;
+      uniform float uStrength;
+      uniform float uTime;
+      varying vec2 vUv;
+      void main(){
+        vec2 dir = vUv - 0.5;
+        float r = texture2D(tDiffuse, vUv - dir*uStrength).r;
+        float g = texture2D(tDiffuse, vUv).g;
+        float b = texture2D(tDiffuse, vUv + dir*uStrength).b;
+        vec3 col = vec3(r,g,b);
+        float n = fract(sin(dot(vUv*uTime, vec2(12.9898,78.233)))*43758.5453);
+        col += (n - 0.5) * 0.018;
+        gl_FragColor = vec4(col, 1.0);
+      }`
+  });
+  composer.addPass(chromaticPass);
+}
+
+/* ── Soft circular texture for particles (from opus) ── */
+function makeSoftTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.4, 'rgba(255,255,255,0.55)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
+/* ── Particle system per hand ── */
+function createHandParticleSystem() {
+  const N = 750;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N * 3);
+  const col = new Float32Array(N * 3);
+  const vel = new Float32Array(N * 3);
+  const lif = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const theta = Math.random() * Math.PI * 2, r = Math.random() * 0.4;
+    pos[i*3]   = Math.cos(theta) * r;
+    pos[i*3+1] = Math.sin(theta) * r;
+    pos[i*3+2] = (Math.random() - 0.5) * 0.4;
+    col[i*3] = 1; col[i*3+1] = 0.6; col[i*3+2] = 1;
+    vel[i*3]   = (Math.random() - 0.5) * 0.022;
+    vel[i*3+1] = (Math.random() - 0.5) * 0.022;
+    vel[i*3+2] = (Math.random() - 0.5) * 0.022;
+    lif[i] = Math.random();
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.07, vertexColors: true, transparent: true, opacity: 0.9,
+    depthWrite: false, blending: THREE.AdditiveBlending,
+    map: makeSoftTexture()
+  });
+  const points = new THREE.Points(geo, mat);
+  points.visible = false;
+
+  // Trail
+  const trailLen = 30;
+  const trailPos = new Float32Array(trailLen * 3);
+  const trailGeo = new THREE.BufferGeometry();
+  trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3));
+  const trailMat = new THREE.LineBasicMaterial({
+    color: 0xb588ff, transparent: true, opacity: 0.65,
+    blending: THREE.AdditiveBlending
+  });
+  const trailLine = new THREE.Line(trailGeo, trailMat);
+  trailLine.visible = false;
+
+  return {
+    points, geo, mat, vel, lif, N,
+    trailLine, trailGeo, trailMat, trailLen,
+    trailHistory: [],
+    currentColor: new THREE.Color(0xffffff),
+    targetColor:  new THREE.Color(0xffffff),
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GESTURE DETECTION
+═══════════════════════════════════════════════════════════════ */
+const fingerTips = [4, 8, 12, 16, 20];
+const fingerMCP  = [2, 5,  9, 13, 17];
+
+function detectGesture(lm) {
+  const tipY  = (i)  => lm[fingerTips[i]].y;
+  const mcpY  = (i)  => lm[fingerMCP[i]]?.y || 0;
+
+  let extended = 0, foldCount = 0;
+  for (let i = 1; i <= 4; i++) {
+    if (tipY(i) < mcpY(i) - 0.02) extended++;
+    else foldCount++;
+  }
+  const thumbTip = lm[4], thumbIp = lm[3];
+  const thumbExt = thumbTip.y < thumbIp.y - 0.018;
+  if (thumbExt) extended++;
+
+  const idxTip = lm[8], thumbPos = lm[4];
+  const pinchDist = Math.hypot(idxTip.x - thumbPos.x, idxTip.y - thumbPos.y);
+
+  const peace    = (extended === 2 && !thumbExt && tipY(1) < mcpY(1) - 0.02 && tipY(2) < mcpY(2) - 0.02 && lm[16].y > lm[13].y);
+  const fist     = (foldCount >= 3 && !thumbExt);
+  const openPalm = (extended >= 4 && !fist);
+  const fullSpread = (extended >= 5);
+
+  if (pinchDist < 0.045) return 'FIRE';
+  if (peace)      return 'WATER';
+  if (fist)       return 'EARTH';
+  if (fullSpread) return 'ARCANE';
+  if (openPalm)   return 'AIR';
+  return 'NONE';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AUDIO ENGINE
+═══════════════════════════════════════════════════════════════ */
+let audioCtx, masterGain, analyser, analyserData;
+let droneOsc1, droneOsc2, droneGain, droneFilter;
+
+function initAudio() {
+  audioCtx   = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioCtx.createGain(); masterGain.gain.value = 0.6;
+  analyser   = audioCtx.createAnalyser(); analyser.fftSize = 512;
+  analyserData = new Uint8Array(analyser.frequencyBinCount);
+
+  masterGain.connect(analyser);
+  analyser.connect(audioCtx.destination);
+
+  droneOsc1 = audioCtx.createOscillator(); droneOsc1.type = 'sine';
+  droneOsc2 = audioCtx.createOscillator(); droneOsc2.type = 'triangle';
+  droneOsc1.frequency.value = 120; droneOsc2.frequency.value = 160;
+  droneFilter = audioCtx.createBiquadFilter();
+  droneFilter.type = 'lowpass'; droneFilter.frequency.value = 800; droneFilter.Q.value = 2;
+  droneGain = audioCtx.createGain(); droneGain.gain.value = 0;
+
+  droneOsc1.connect(droneFilter); droneOsc2.connect(droneFilter);
+  droneFilter.connect(droneGain); droneGain.connect(masterGain);
+  droneOsc1.start(); droneOsc2.start();
+  droneGain.gain.linearRampToValueAtTime(0.06, audioCtx.currentTime + 2);
+}
+
+function setDroneFreq(f1, f2) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  droneOsc1.frequency.linearRampToValueAtTime(f1, t + 0.25);
+  droneOsc2.frequency.linearRampToValueAtTime(f2, t + 0.25);
+}
+
+function playGestureSound(g, intensity = 0.85) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const out = audioCtx.createGain(); out.gain.value = 0; out.connect(masterGain);
+
+  switch (g) {
+    case 'EARTH': {
+      const o = audioCtx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 55;
+      const f = audioCtx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 200;
+      o.connect(f); f.connect(out);
+      out.gain.linearRampToValueAtTime(0.35 * intensity, t + 0.04);
+      out.gain.exponentialRampToValueAtTime(0.001, t + 1.3);
+      o.frequency.exponentialRampToValueAtTime(35, t + 1.1);
+      o.start(t); o.stop(t + 1.4);
+      break;
+    }
+    case 'AIR': {
+      const buf = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * 0.7), audioCtx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+      const src = audioCtx.createBufferSource(); src.buffer = buf;
+      const f = audioCtx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2200; f.Q.value = 4;
+      src.connect(f); f.connect(out);
+      out.gain.linearRampToValueAtTime(0.25 * intensity, t + 0.04);
+      out.gain.exponentialRampToValueAtTime(0.001, t + 0.75);
+      f.frequency.linearRampToValueAtTime(4800, t + 0.65);
+      src.start(t);
+      break;
+    }
+    case 'FIRE': {
+      for (let i = 0; i < 4; i++) {
+        const z = audioCtx.createOscillator(); z.type = 'square'; z.frequency.value = 400 + i * 180;
+        const e = audioCtx.createGain(); e.gain.value = 0.13 * intensity;
+        z.connect(e); e.connect(masterGain);
+        e.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+        z.start(t); z.stop(t + 0.42);
+      }
+      const buf2 = audioCtx.createBuffer(1, 8000, audioCtx.sampleRate);
+      const d2 = buf2.getChannelData(0);
+      for (let i = 0; i < d2.length; i++) d2[i] = (Math.random() * 2 - 1) * Math.exp(-i / 1800);
+      const cr = audioCtx.createBufferSource(); cr.buffer = buf2; cr.connect(masterGain); cr.start(t);
+      break;
+    }
+    case 'WATER': {
+      const o = audioCtx.createOscillator(); o.type = 'sine'; o.frequency.value = 290;
+      const lfo = audioCtx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 6;
+      const lfoGain = audioCtx.createGain(); lfoGain.gain.value = 12;
+      lfo.connect(lfoGain); lfoGain.connect(o.frequency);
+      o.connect(out);
+      out.gain.linearRampToValueAtTime(0.22 * intensity, t + 0.06);
+      out.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
+      o.start(t); lfo.start(t); o.stop(t + 1.5); lfo.stop(t + 1.5);
+      break;
+    }
+    case 'ARCANE': {
+      const freqs = [880, 660, 1100, 440];
+      freqs.forEach((freq, i) => {
+        const o = audioCtx.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
+        const g2 = audioCtx.createGain(); g2.gain.value = 0.08 * intensity;
+        o.connect(g2); g2.connect(masterGain);
+        g2.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
+        o.start(t + i * 0.06); o.stop(t + 2);
+      });
+      break;
+    }
+  }
+}
+
+function playMegaSpell(g) {
+  if (!audioCtx) return;
+  playGestureSound(g, 1.8);
+  // boom sub
+  const t = audioCtx.currentTime;
+  const sub = audioCtx.createOscillator(); sub.type = 'sine'; sub.frequency.value = 40;
+  const subGain = audioCtx.createGain(); subGain.gain.value = 0;
+  sub.connect(subGain); subGain.connect(masterGain);
+  subGain.gain.linearRampToValueAtTime(0.4, t + 0.05);
+  subGain.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
+  sub.frequency.exponentialRampToValueAtTime(20, t + 1.5);
+  sub.start(t); sub.stop(t + 2);
+}
+
+function playFusionSound() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  [528, 432, 639, 741, 852].forEach((freq, i) => {
+    const o = audioCtx.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
+    const g2 = audioCtx.createGain(); g2.gain.value = 0;
+    o.connect(g2); g2.connect(masterGain);
+    g2.gain.linearRampToValueAtTime(0.08, t + i * 0.07);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 2.5);
+    o.start(t); o.stop(t + 2.8);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CANVAS FX  — INK / SHOCK / AUDIO VIZ
+═══════════════════════════════════════════════════════════════ */
+function addInkSplash(gesture, x, y, intensity = 0.8) {
+  const w = inkCanvas.width, h = inkCanvas.height;
+  const sx = x * w, sy = y * h;
+  const { hue } = GESTURES[gesture] || GESTURES.NONE;
+  const count = 14 + Math.floor(intensity * 16);
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const rad   = 10 + Math.random() * 44;
+    inkCtx.beginPath();
+    inkCtx.arc(sx + Math.cos(angle) * rad, sy + Math.sin(angle) * rad,
+               Math.random() * 6 + 2, 0, Math.PI * 2);
+    inkCtx.fillStyle = `hsla(${hue}, 88%, 66%, ${0.45 + Math.random() * 0.45})`;
+    inkCtx.fill();
+  }
+  // fade out
+  setTimeout(() => {
+    inkCtx.clearRect(0, 0, w, h);
+  }, 200);
+}
+
+function flashShock(intensity = 1) {
+  const w = shockCanvas.width, h = shockCanvas.height;
+  shockCtx.fillStyle = `rgba(255, 200, 255, ${0.18 + intensity * 0.28})`;
+  shockCtx.fillRect(0, 0, w, h);
+  setTimeout(() => shockCtx.clearRect(0, 0, w, h), 80);
+}
+
+function drawAudioViz() {
+  if (!analyser) return;
+  analyser.getByteFrequencyData(analyserData);
+  const w = audioVizCv.width, h = audioVizCv.height;
+  audioVizCx.clearRect(0, 0, w, h);
+  const bars = analyserData.length / 2;
+  const bw   = w / bars;
+  for (let i = 0; i < bars; i++) {
+    const v = analyserData[i] / 255;
+    const bh = v * h * 0.9;
+    const hue = GESTURES[state.globalGesture]?.hue ?? 270;
+    audioVizCx.fillStyle = `hsla(${hue + i * 0.5}, 85%, 65%, ${0.55 + v * 0.4})`;
+    audioVizCx.fillRect(i * bw, h - bh, bw - 1, bh);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SPELL LOG
+═══════════════════════════════════════════════════════════════ */
+function logSpell(text) {
+  const el = document.createElement('div');
+  el.className = 'logEntry';
+  el.textContent = text;
+  spellLog.prepend(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MEGA SPELL BANNER
+═══════════════════════════════════════════════════════════════ */
+function triggerMegaSpell(gesture, isFusion = false) {
+  if (state.spellCooldown > 0) return;
+  state.spellCooldown = 2.5;
+
+  const gDef = GESTURES[gesture];
+  const names = MEGA_NAMES[gesture] || ['MEGA SPELL'];
+  const spellName = names[Math.floor(Math.random() * names.length)];
+
+  megaTitle.textContent = isFusion ? '⚡ ELDER FUSION ⚡' : spellName;
+  megaSubtitle.textContent = isFusion ? `${gDef.name} × ${gDef.name}` : `${gDef.name} unleashed`;
+  megaBanner.classList.remove('show');
+  void megaBanner.offsetWidth;
+  megaBanner.classList.add('show');
+  setTimeout(() => megaBanner.classList.remove('show'), 2300);
+
+  // Screen effects
+  flashShock(isFusion ? 2 : 1.2);
+  state.shake = isFusion ? 18 : 10;
+  state.bloomBoost = isFusion ? 3.5 : 2.5;
+
+  if (isFusion) {
+    playFusionSound();
+    logSpell(`✦ Elder Fusion ignited — ${gDef.name}`);
+  } else {
+    playMegaSpell(gesture);
+    logSpell(`✦ ${spellName}`);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UPDATE PARTICLE SYSTEMS
+═══════════════════════════════════════════════════════════════ */
+function updateHandParticles(hd, dt) {
+  const sys = hd.system;
+  if (!sys) return;
+
+  const active = hd.present && hd.gesture !== 'NONE';
+  sys.points.visible  = active;
+  sys.trailLine.visible = active;
+  if (!active) return;
+
+  const gDef = GESTURES[hd.gesture] || GESTURES.NONE;
+  sys.targetColor.copy(gDef.color);
+  sys.currentColor.lerp(sys.targetColor, 0.08);
+
+  const pos = sys.geo.attributes.position.array;
+  const col = sys.geo.attributes.color.array;
+
+  // move particles
+  for (let i = 0; i < sys.N; i++) {
+    sys.lif[i] -= dt * 0.9;
+    if (sys.lif[i] <= 0) {
+      sys.lif[i] = 1;
+      pos[i*3]   = (Math.random() - 0.5) * 0.3;
+      pos[i*3+1] = (Math.random() - 0.5) * 0.3;
+      pos[i*3+2] = (Math.random() - 0.5) * 0.3;
+      sys.vel[i*3]   = (Math.random() - 0.5) * 0.025;
+      sys.vel[i*3+1] = (Math.random() - 0.5) * 0.025;
+      sys.vel[i*3+2] = (Math.random() - 0.5) * 0.025;
+    }
+    pos[i*3]   += sys.vel[i*3]   * dt * 60;
+    pos[i*3+1] += sys.vel[i*3+1] * dt * 60;
+    pos[i*3+2] += sys.vel[i*3+2] * dt * 60;
+
+    const t2 = sys.lif[i];
+    const c2 = GESTURES[hd.gesture]?.color2 || gDef.color;
+    const blended = new THREE.Color().lerpColors(c2, gDef.color, t2);
+    col[i*3] = blended.r; col[i*3+1] = blended.g; col[i*3+2] = blended.b;
+  }
+  sys.geo.attributes.position.needsUpdate = true;
+  sys.geo.attributes.color.needsUpdate    = true;
+
+  sys.mat.color.copy(sys.currentColor);
+  sys.trailMat.color.copy(gDef.color);
+
+  // offset to palm
+  sys.points.position.copy(hd.palm);
+
+  // trail
+  sys.trailHistory.unshift(hd.palm.clone());
+  if (sys.trailHistory.length > sys.trailLen) sys.trailHistory.pop();
+  const trailArr = sys.trailGeo.attributes.position.array;
+  for (let i = 0; i < sys.trailLen; i++) {
+    const p = sys.trailHistory[i] || hd.palm;
+    trailArr[i*3] = p.x; trailArr[i*3+1] = p.y; trailArr[i*3+2] = p.z;
+  }
+  sys.trailGeo.attributes.position.needsUpdate = true;
+  sys.trailLine.position.set(0, 0, 0);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN RENDER LOOP
+═══════════════════════════════════════════════════════════════ */
+const CHARGE_HOLD = 2.2; // seconds to fill mega charge
+
+function tick(now) {
+  requestAnimationFrame(tick);
+  if (!state.running) return;
+
+  const dt = Math.min((now - state.lastTime) / 1000, 0.05);
+  state.lastTime = now;
+
+  // FPS
+  state.frames++;
+  state.fpsAccum += dt;
+  if (state.fpsAccum >= 0.5) {
+    state.fps = Math.round(state.frames / state.fpsAccum);
+    fpsEl.textContent = state.fps;
+    state.frames = 0; state.fpsAccum = 0;
+  }
+
+  // Spell cooldown
+  if (state.spellCooldown > 0) state.spellCooldown -= dt;
+
+  // Determine dominant gesture
+  const presentHands = state.handsData.filter(h => h.present);
+  let dominant = 'NONE';
+  for (const h of presentHands) {
+    if (h.gesture !== 'NONE') { dominant = h.gesture; break; }
+  }
+
+  // Fusion detection
+  const fusion = presentHands.length === 2 &&
+    presentHands[0].gesture !== 'NONE' &&
+    presentHands[0].gesture === presentHands[1].gesture;
+
+  if (fusion !== state.fusionActive) {
+    state.fusionActive = fusion;
+    fusionRow.style.display = fusion ? 'flex' : 'none';
+    if (fusion) { playFusionSound(); state.fusionTimer = 0; }
+  }
+  if (state.fusionActive) state.fusionTimer += dt;
+
+  state.globalGesture = dominant;
+  handsCountEl.textContent = presentHands.length;
+  gestureTagEl.textContent  = GESTURES[dominant]?.name ?? '—';
+
+  // Charge
+  const charging = dominant !== 'NONE';
+  if (charging) {
+    state.chargeTime += dt;
+    state.mana = Math.min(state.chargeTime / CHARGE_HOLD, 1);
+  } else {
+    if (state.mana > 0.15 && state.chargeTime > 0.3 && !state.charged) {
+      state.charged = true;
+      const isFusion = state.fusionActive;
+      const g = state.handsData.find(h => h.present && h.gesture !== 'NONE')?.gesture || 'NONE';
+      if (g !== 'NONE') triggerMegaSpell(g, isFusion);
+      // ink splash at both hands
+      for (const h of state.handsData.filter(h => h.present)) {
+        addInkSplash(g, h.screen.x, h.screen.y, state.mana);
+      }
+    }
+    state.chargeTime = 0;
+    state.mana = Math.max(0, state.mana - dt * 1.8);
+    state.charged = false;
+  }
+  if (state.mana >= 1 && !state.charged && charging) {
+    // Full charge — auto fire mega
+    state.charged = true;
+    const isFusion = state.fusionActive;
+    const g = dominant;
+    triggerMegaSpell(g, isFusion);
+    for (const h of state.handsData.filter(h => h.present)) {
+      addInkSplash(g, h.screen.x, h.screen.y, 1.5);
+    }
+  }
+  chargeBarEl.style.width = `${(state.mana * 100).toFixed(1)}%`;
+
+  // Drone freq
+  const gd = GESTURES[dominant];
+  if (gd) setDroneFreq(gd.freq, gd.hz2);
+
+  // Audio viz
+  drawAudioViz();
+
+  // ── Three.js updates ──
+  const t3 = now * 0.001;
+  chromaticPass.uniforms.uTime.value = t3;
+
+  // Bloom
+  const targetBloom = 1.1 + state.bloomBoost * 0.4 + state.mana * 0.8 + (state.fusionActive ? 1.2 : 0);
+  bloomPass.strength += (targetBloom - bloomPass.strength) * 0.06;
+  state.bloomBoost = Math.max(1, state.bloomBoost - dt * 2);
+
+  // Screen shake
+  if (state.shake > 0) {
+    camera.position.x = (Math.random() - 0.5) * state.shake * 0.015;
+    camera.position.y = (Math.random() - 0.5) * state.shake * 0.015;
+    state.shake *= 0.88;
+    if (state.shake < 0.1) { state.shake = 0; camera.position.x = 0; camera.position.y = 0; }
+  }
+
+  // Core orb
+  coreOrb.rotation.x = t3 * 0.22;
+  coreOrb.rotation.y = t3 * 0.35;
+  const orbTargetColor = gd?.color ?? new THREE.Color(0xb588ff);
+  coreOrbMat.color.lerp(orbTargetColor, 0.04);
+  const glowScale = 1 + state.mana * 0.4 + (state.fusionActive ? 0.3 : 0);
+  coreGlow.scale.setScalar(glowScale);
+
+  // Starfield slow drift
+  starField.rotation.y = t3 * 0.012;
+  starField.rotation.x = t3 * 0.006;
+
+  // Ambient rune rings
+  ambientRunes.forEach((ring, i) => {
+    ring.rotation.x += dt * (0.08 + i * 0.04);
+    ring.rotation.z += dt * (0.05 + i * 0.03);
+    ring.material.opacity = 0.06 + (state.fusionActive ? 0.12 : 0) + state.mana * 0.08;
+    const rCol = gd?.color ?? new THREE.Color(0x8855cc);
+    ring.material.color.lerp(rCol, 0.03);
+  });
+
+  // Fusion glyph
+  if (state.fusionActive) {
+    fusionGlyph.group.visible = true;
+    fusionGlyph.ring1.rotation.z = t3 * 1.2;
+    fusionGlyph.ring2.rotation.z = -t3 * 2.1;
+    fusionGlyph.ring3.rotation.x = t3 * 0.8;
+    const ft = Math.min(state.fusionTimer / 0.5, 1);
+    fusionGlyph.ring1.material.opacity = ft * 0.75;
+    fusionGlyph.ring2.material.opacity = ft * 0.6;
+    fusionGlyph.ring3.material.opacity = ft * 0.5;
+    const fc = gd?.color ?? new THREE.Color(0xffaaff);
+    fusionGlyph.ring1.material.color.lerp(fc, 0.05);
+    fusionGlyph.ring2.material.color.lerp(gd?.color2 ?? fc, 0.05);
+  } else {
+    fusionGlyph.ring1.material.opacity *= 0.88;
+    fusionGlyph.ring2.material.opacity *= 0.88;
+    fusionGlyph.ring3.material.opacity *= 0.88;
+    if (fusionGlyph.ring1.material.opacity < 0.01) fusionGlyph.group.visible = false;
+  }
+
+  // Hand particles
+  for (const hd of state.handsData) updateHandParticles(hd, dt);
+
+  composer.render();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MEDIAPIPE SETUP
+═══════════════════════════════════════════════════════════════ */
+function setupMediaPipe() {
+  const hands = new Hands({
+    locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+  });
+  hands.setOptions({
+    maxNumHands: 2,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.7,
+    minTrackingConfidence: 0.6,
+  });
+
+  hands.onResults((results) => {
+    // Draw landmarks on debug canvas
+    dbgCtx.clearRect(0, 0, debugCanvas.width, debugCanvas.height);
+
+    const detected = results.multiHandLandmarks || [];
+    state.handsData[0].present = false;
+    state.handsData[1].present = false;
+
+    detected.forEach((lm, hi) => {
+      if (hi > 1) return;
+      const hd = state.handsData[hi];
+      hd.present = true;
+
+      const g = detectGesture(lm);
+      hd.prevGesture = hd.gesture;
+      hd.gesture     = g;
+
+      if (g !== 'NONE' && g !== hd.prevGesture) {
+        playGestureSound(g, 0.7);
+        addInkSplash(g, hd.screen.x, hd.screen.y, 0.5);
+      }
+      if (g !== 'NONE') hd.gestureHoldTime += 0.033;
+      else hd.gestureHoldTime = 0;
+
+      // Palm world position (flip x for mirror)
+      const palm2d = lm[9];
+      hd.screen.x  = 1 - palm2d.x;
+      hd.screen.y  = palm2d.y;
+      const wx = (hd.screen.x - 0.5) * 7;
+      const wy = -(hd.screen.y - 0.5) * 5;
+      hd.palm.set(wx, wy, 0);
+
+      // Debug: draw skeleton
+      const gDef = GESTURES[g] || GESTURES.NONE;
+      const dw = debugCanvas.width, dh = debugCanvas.height;
+      dbgCtx.strokeStyle = `rgba(${Math.round(gDef.color.r*255)},${Math.round(gDef.color.g*255)},${Math.round(gDef.color.b*255)}, 0.9)`;
+      dbgCtx.lineWidth = 2;
+      const CONNECTIONS = [
+        [0,1],[1,2],[2,3],[3,4],
+        [0,5],[5,6],[6,7],[7,8],
+        [9,10],[10,11],[11,12],
+        [13,14],[14,15],[15,16],
+        [17,18],[18,19],[19,20],
+        [0,17],[5,9],[9,13],[13,17]
+      ];
+      CONNECTIONS.forEach(([a, b]) => {
+        dbgCtx.beginPath();
+        dbgCtx.moveTo((1 - lm[a].x) * dw, lm[a].y * dh);
+        dbgCtx.lineTo((1 - lm[b].x) * dw, lm[b].y * dh);
+        dbgCtx.stroke();
+      });
+      lm.forEach(pt => {
+        dbgCtx.beginPath();
+        dbgCtx.arc((1 - pt.x) * dw, pt.y * dh, 3, 0, Math.PI * 2);
+        dbgCtx.fillStyle = 'rgba(255,220,255,0.85)';
+        dbgCtx.fill();
+      });
+    });
+  });
+
+  const mpCamera = new Camera(videoEl, {
+    onFrame: async () => { await hands.send({ image: videoEl }); },
+    width: 640, height: 480
+  });
+  mpCamera.start();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════════════════════════ */
+document.getElementById('startBtn').addEventListener('click', () => {
+  const overlay = document.getElementById('startOverlay');
+  overlay.classList.add('hidden');
+
+  setTimeout(() => {
+    overlay.style.display = 'none';
+    document.getElementById('hud').style.display = 'block';
+    document.getElementById('instructionHint').style.display = 'block';
+  }, 1300);
+
+  initAudio();
+  initThree();
+  resizeAll();
+  setupMediaPipe();
+
+  state.running   = true;
+  state.lastTime  = performance.now();
+  requestAnimationFrame(tick);
+});
+
+</script>
+</body>
+</html>
